@@ -140,22 +140,24 @@ def export_dit(variant: str = "music") -> str:
     # -----------------------------------------------------------------
     # Resolve dimensions from model config with safe fallbacks
     # -----------------------------------------------------------------
-    # Latent time dimension: at 44100 Hz with ~512x downsampling ≈ 86 frames/s
+    # Latent time dimension: at 44100 Hz with 4096x downsampling ≈ 10.76 frames/s
     # Use 512 as export length; dynamic axis handles actual lengths at runtime
-    LATENT_T   = 512
-    TEXT_SEQ   = 77       # safe default (CLIP-style); T5 can be longer
-    GLOBAL_DIM = int(model_config.get("global_cond_dim", 768))
-    LOCAL_DIM  = int(model_config.get("local_cond_dim",  0))
+    LATENT_T    = 512
+    TEXT_SEQ    = int(model_config.get("conditioning", {}).get("configs", [{}])[0]
+                      .get("config", {}).get("max_length", MAX_SEQ_LEN))
+    COND_DIM    = int(model_config.get("conditioning", {}).get("cond_dim", 768))
+    GLOBAL_DIM  = int(model_config.get("global_cond_dim", 768))
+    LOCAL_DIM   = int(model_config.get("local_cond_dim", 0))
 
     print(f"[export_dit] Dims — latent_channels={LATENT_CHANNELS}, "
-          f"latent_t={LATENT_T}, text_seq={TEXT_SEQ}, global_dim={GLOBAL_DIM}")
+          f"latent_t={LATENT_T}, text_seq={TEXT_SEQ}, cond_dim={COND_DIM}, global_dim={GLOBAL_DIM}")
 
     # -----------------------------------------------------------------
     # Dummy inputs
     # -----------------------------------------------------------------
     dummy_latent    = torch.randn(BATCH_SIZE, LATENT_CHANNELS, LATENT_T)
     dummy_timestep  = torch.tensor([0.5] * BATCH_SIZE, dtype=torch.float32)
-    dummy_text_cond = torch.randn(BATCH_SIZE, TEXT_SEQ, 768, dtype=torch.float32)
+    dummy_text_cond = torch.randn(BATCH_SIZE, TEXT_SEQ, COND_DIM, dtype=torch.float32)
     dummy_mask      = torch.ones( BATCH_SIZE, LATENT_T, dtype=torch.bool)
     dummy_global    = torch.randn(BATCH_SIZE, GLOBAL_DIM) if GLOBAL_DIM > 0 else None
 
@@ -190,6 +192,7 @@ def export_dit(variant: str = "music") -> str:
             wrapped,
             args,
             out_path,
+            dynamo=False,           # force TorchScript path (torch 2.12+ defaults to dynamo=True)
             opset_version=OPSET_VERSION,
             do_constant_folding=True,
             input_names=input_names,

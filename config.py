@@ -13,8 +13,8 @@ LOCAL_CHECKPOINT_PATHS = {
 
 OPSET_VERSION   = 18
 BATCH_SIZE      = 1
-MAX_SEQ_LEN     = 512      # text encoder max tokens
-LATENT_CHANNELS = 64       # SA3 Small latent dim — verify against model config
+MAX_SEQ_LEN     = 256      # t5gemma conditioner max_length (from model_config.json)
+LATENT_CHANNELS = 256      # SA3 Small latent dim (diffusion.config.io_channels = 256)
 SAMPLE_RATE     = 44100    # SA3 target sample rate
 
 OUTPUT_ROOT = "models"

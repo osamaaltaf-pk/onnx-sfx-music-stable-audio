@@ -100,6 +100,9 @@ def export_text_encoder(variant: str = "music") -> str:
 
     encoder = _locate_text_encoder(model)
     encoder.eval()
+    # Cast to float32 — T5Gemma uses BFloat16 internally which produces
+    # Mul(14) ONNX nodes that ORT CPU cannot execute. FP32 maps to Mul(13).
+    encoder = encoder.float()
 
     # Dummy inputs: (batch, seq_len) integer token IDs and boolean attention mask
     dummy_ids  = torch.zeros(BATCH_SIZE, MAX_SEQ_LEN, dtype=torch.long)
@@ -115,6 +118,7 @@ def export_text_encoder(variant: str = "music") -> str:
             encoder,
             (dummy_ids, dummy_mask),
             out_path,
+            dynamo=False,           # force TorchScript path (torch 2.12+ defaults to dynamo=True)
             opset_version=OPSET_VERSION,
             do_constant_folding=True,
             input_names=["input_ids", "attention_mask"],

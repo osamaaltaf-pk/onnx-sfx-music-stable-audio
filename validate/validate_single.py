@@ -45,7 +45,10 @@ def _make_feeds(session: ort.InferenceSession) -> dict[str, np.ndarray]:
         ]
         type_str = inp.type.lower()
         if "int" in type_str or "bool" in type_str:
-            feeds[inp.name] = np.zeros(shape, dtype=np.int64)
+            if "mask" in inp.name.lower():
+                feeds[inp.name] = np.ones(shape, dtype=np.int64)
+            else:
+                feeds[inp.name] = np.zeros(shape, dtype=np.int64)
         else:
             feeds[inp.name] = np.random.randn(*shape).astype(np.float32)
     return feeds

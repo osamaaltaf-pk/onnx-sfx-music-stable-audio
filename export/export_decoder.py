@@ -59,27 +59,50 @@ def _load_model(variant: str):
 
 def _locate_decoder(model):
     """
-    Find the Oobleck decoder module inside the SA3 model.
-    Primary path: model.autoencoder.decoder
+    Find the audio decoder module inside the SA3 model.
+
+    SA3 Small model structure (stable-audio-tools 0.0.20):
+        model.pretransform               -> AutoencoderPretransform
+        model.pretransform.model         -> AudioAutoencoder
+        model.pretransform.model.decoder -> SAMEDecoder  ← primary path
     """
-    # Primary: SA3 autoencoder
+    # SA3 Small (0.0.20+): pretransform → AudioAutoencoder → SAMEDecoder
+    try:
+        dec = model.pretransform.model.decoder
+        print("[export_decoder] Found decoder at: model.pretransform.model.decoder")
+        return dec
+    except AttributeError:
+        pass
+
+    # SA3 full / older: pretransform → decoder
+    try:
+        dec = model.pretransform.decoder
+        print("[export_decoder] Found decoder at: model.pretransform.decoder")
+        return dec
+    except AttributeError:
+        pass
+
+    # Legacy: direct autoencoder
     if hasattr(model, "autoencoder") and hasattr(model.autoencoder, "decoder"):
         print("[export_decoder] Found decoder at: model.autoencoder.decoder")
         return model.autoencoder.decoder
 
-    # Alternate: VAE naming
+    # Legacy: VAE naming
     if hasattr(model, "vae") and hasattr(model.vae, "decoder"):
         print("[export_decoder] Found decoder at: model.vae.decoder")
         return model.vae.decoder
 
-    # Alternate: direct decoder attribute
+    # Legacy: direct decoder attribute
     if hasattr(model, "decoder"):
         print("[export_decoder] Found decoder at: model.decoder")
         return model.decoder
 
     raise AttributeError(
-        "Cannot locate Oobleck decoder. Inspect model structure with "
-        "`print(model)` and update _locate_decoder() in export_decoder.py."
+        "Cannot locate audio decoder. Inspect model structure with "
+        "`print(model)` and update _locate_decoder() in export_decoder.py.\n"
+        "Hint: Run: python -c \"from stable_audio_tools import get_pretrained_model; "
+        "m,_=get_pretrained_model('stabilityai/stable-audio-3-small-music'); "
+        "[print(n) for n,_ in m.named_modules()]\""
     )
 
 
@@ -114,6 +137,7 @@ def export_decoder(variant: str = "music") -> str:
             decoder,
             dummy_z,
             out_path,
+            dynamo=False,           # force TorchScript path (torch 2.12+ defaults to dynamo=True)
             opset_version=OPSET_VERSION,
             do_constant_folding=True,
             input_names=["latents"],

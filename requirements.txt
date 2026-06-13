@@ -55,6 +55,12 @@ diffusers==0.27.2
 onnx==1.16.0
 onnxconverter-common==1.16.0
 
+# torch 2.12 ONNX export backend — required even when using dynamo=False
+# (torch.onnx.__init__ imports onnxscript at module level)
+onnxscript==0.7.0
+onnx-ir==0.2.1              # onnxscript 0.7.0 dependency
+ml_dtypes==0.5.4            # onnx-ir dependency (BFloat16 / Float8 dtype support)
+
 # --- CPU (default) ---
 onnxruntime==1.26.0         # 1.26.0 supports numpy 2.x — do NOT use 1.18.0 with Python 3.12
 

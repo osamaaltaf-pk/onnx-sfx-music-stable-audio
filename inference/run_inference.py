@@ -45,7 +45,7 @@ def _pick_precision(tier: str) -> str:
 
 def _load_sessions(variant: str, precision: str) -> dict[str, object]:
     """
-    Load all 4 ONNX sessions for the given variant and precision.
+    Load all ONNX sessions for the given variant and precision.
     Falls back to fp16 for any module whose quantized file is missing.
     """
     base   = Path(OUTPUT_ROOT) / variant / precision
@@ -58,6 +58,9 @@ def _load_sessions(variant: str, precision: str) -> dict[str, object]:
         if not path.exists():
             path = fp16 / f"{m}.onnx"
             if not path.exists():
+                if m == "conditioner":
+                    # Conditioner is optional in some architectures (like SA3 Small)
+                    continue
                 raise FileNotFoundError(
                     f"ONNX model not found for '{m}' ({variant}). "
                     "Run export_all.py first."
@@ -144,14 +147,16 @@ def run_onnx_pipeline(
     # ------------------------------------------------------------------
     # Step 3: Duration conditioning
     # ------------------------------------------------------------------
-    seconds_start = np.array([[0.0]],                dtype=np.float32)
-    seconds_total = np.array([[duration_seconds]],   dtype=np.float32)
+    global_cond = None
+    if "conditioner" in sessions:
+        seconds_start = np.array([[0.0]],                dtype=np.float32)
+        seconds_total = np.array([[duration_seconds]],   dtype=np.float32)
 
-    global_cond: np.ndarray = sessions["conditioner"].run(
-        None,
-        {"seconds_start": seconds_start, "seconds_total": seconds_total},
-    )[0]
-    print(f"[inference] global_cond shape: {global_cond.shape}")
+        global_cond = sessions["conditioner"].run(
+            None,
+            {"seconds_start": seconds_start, "seconds_total": seconds_total},
+        )[0]
+        print(f"[inference] global_cond shape: {global_cond.shape}")
 
     # ------------------------------------------------------------------
     # Step 4: Initialise latent noise

@@ -1,11 +1,13 @@
 # patches/attention_patch.py
 """
-Replaces torch.nn.functional.scaled_dot_product_attention (SDPA) with an
-ONNX opset-18 compatible implementation before any torch.onnx.export() call.
+Replaces torch.nn.functional ops with ONNX opset-18 compatible versions
+before any torch.onnx.export() call.
 
-SA3 uses SDPA internally which normally exports a FlashAttention node —
-not supported in ONNX opset 18. This patch replaces it with a standard
-MatMul + Softmax sequence that traces cleanly.
+Patches applied:
+  1. scaled_dot_product_attention -> MatMul + Softmax
+     (aten::sdpa has no opset-18 symbolic; FlashAttention not ONNX-compatible)
+  2. rms_norm -> pow/mean/rsqrt/mul decomposition
+     (aten::rms_norm has no opset-18 symbolic in TorchScript exporter)
 
 Usage:
     from patches.attention_patch import apply_attention_patch
@@ -27,19 +29,7 @@ def _onnx_safe_sdpa(
 ):
     """
     Drop-in replacement for F.scaled_dot_product_attention.
-    Uses standard MatMul + Softmax — fully ONNX opset 18 compatible.
-
-    Args:
-        query:      (..., L, E)
-        key:        (..., S, E)
-        value:      (..., S, Ev)
-        attn_mask:  Optional mask; bool tensors become additive -inf masks.
-        dropout_p:  Applied to attention weights during training.
-        is_causal:  If True, applies causal (lower-triangular) masking.
-        scale:      Optional explicit scale factor; defaults to 1/sqrt(E).
-
-    Returns:
-        Attention output (..., L, Ev)
+    Uses standard MatMul + Softmax -- fully ONNX opset 18 compatible.
     """
     import math
 
@@ -72,25 +62,85 @@ def _onnx_safe_sdpa(
     return attn_weight @ value
 
 
+def _onnx_safe_rms_norm(input, normalized_shape, weight=None, bias=None, eps=1e-5):
+    """
+    Drop-in replacement for F.rms_norm.
+
+    aten::rms_norm has no ONNX opset-18 symbolic handler in the TorchScript
+    exporter. Decomposes into basic ops that trace cleanly:
+        variance = mean(x^2, dims)
+        output   = x * rsqrt(variance + eps) * weight
+
+    Args:
+        input:            Input tensor (..., *normalized_shape)
+        normalized_shape: Shape of the trailing dims to normalize over
+        weight:           Optional learnable scale (gamma)
+        bias:             Optional bias (not used in RMSNorm, kept for compat)
+        eps:              Numerical stability constant
+    """
+    dims = list(range(-len(normalized_shape), 0))
+    variance = input.pow(2).mean(dims, keepdim=True)
+    output = input * torch.rsqrt(variance + eps)
+    if weight is not None:
+        output = output * weight
+    if bias is not None:
+        output = output + bias
+    return output
+
+
+def _onnx_safe_zero_pad_modulo_sequence(x, size, dim=-2):
+    """
+    ONNX-safe version of _zero_pad_modulo_sequence that avoids python control flow
+    based on dynamic shapes (which bakes static shapes into the ONNX graph).
+    """
+    if dim < 0:
+        dim = x.ndim + dim
+
+    input_len = x.shape[dim]
+    pad_len = (size - input_len % size) % size
+
+    max_pad = size - 1
+    if max_pad <= 0:
+        return x
+
+    pad_shape = list(x.shape)
+    pad_shape[dim] = max_pad
+
+    zeros = torch.zeros(pad_shape, dtype=x.dtype, device=x.device)
+    padded_zeros = torch.narrow(zeros, dim, 0, pad_len)
+    return torch.cat([x, padded_zeros], dim=dim)
+
+
 def apply_attention_patch() -> None:
     """
-    Monkey-patches F.scaled_dot_product_attention with the ONNX-safe version.
+    Monkey-patches F.scaled_dot_product_attention, F.rms_norm, and
+    autoencoders._zero_pad_modulo_sequence with ONNX-safe implementations.
 
-    Call this ONCE before any torch.onnx.export() call.
-    Safe to call multiple times — subsequent calls are no-ops logged at DEBUG.
+    Call ONCE before any torch.onnx.export(). Idempotent -- safe to call
+    multiple times.
     """
     if getattr(F, "_onnx_patch_applied", False):
-        # Already patched; avoid double-patching
         import logging
-        logging.getLogger(__name__).debug(
-            "[attention_patch] Already applied — skipping."
-        )
+        logging.getLogger(__name__).debug("[attention_patch] Already applied -- skipping.")
         return
 
+    # 1. SDPA -> MatMul + Softmax
     F.scaled_dot_product_attention = _onnx_safe_sdpa
     torch.nn.functional.scaled_dot_product_attention = _onnx_safe_sdpa
 
-    # Mark so re-entry is a no-op
+    # 2. rms_norm -> pow/mean/rsqrt/mul
+    F.rms_norm = _onnx_safe_rms_norm
+    torch.nn.functional.rms_norm = _onnx_safe_rms_norm
+
+    # 3. autoencoders._zero_pad_modulo_sequence -> ONNX-safe slice/pad
+    try:
+        import stable_audio_tools.models.autoencoders as autoencoders
+        autoencoders._zero_pad_modulo_sequence = _onnx_safe_zero_pad_modulo_sequence
+        print("[attention_patch] _zero_pad_modulo_sequence replaced with ONNX-safe slice/pad implementation.")
+    except ImportError:
+        print("[attention_patch] WARNING: Could not import stable_audio_tools.models.autoencoders to patch _zero_pad_modulo_sequence.")
+
     F._onnx_patch_applied = True  # type: ignore[attr-defined]
 
     print("[attention_patch] SDPA replaced with ONNX-safe MatMul+Softmax implementation.")
+    print("[attention_patch] rms_norm replaced with ONNX-safe pow/mean/rsqrt decomposition.")

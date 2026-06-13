@@ -204,6 +204,8 @@ OUTPUT_ROOT     = "models"
 | `transformers==5.12.0` → `is_offline_mode` missing from `huggingface_hub` | `huggingface_hub 0.36.x` removed the function | Upgrade to `huggingface_hub==1.19.0` + `accelerate==1.14.0` |
 | `transformers==5.12.0` → `No module named 'httpx'` / `httpcore` | transformers 5.x uses httpx; we used `--no-deps` earlier | Install `httpx`, `httpcore`, `anyio`, `sniffio`, `h11` |
 | `tokenizers==0.23.1` rejected by transformers | transformers 5.12.0 requires `>=0.22.0,<=0.23.0`; 0.23.0 doesn't exist | Use `tokenizers==0.22.2` |
+| `text_encoder` BFloat16 validation failure | aten::mul on BFloat16 produces `Mul(14)` node unsupported on CPU | Cast text encoder to float32 before export (resolves to standard `Mul(13)`) |
+| `decoder` Reshape mismatch during validation | Dynamic conditional `if pad_len > 0` bakes static shape into Reshape node | Monkeypatch `_zero_pad_modulo_sequence` to perform static padding + narrow slice |
 
 ---
 
@@ -242,11 +244,12 @@ stable_audio_onnx/
 │   ├── validate_single.py           # Single-module output check
 │   └── validate_pipeline.py         # End-to-end denoising check
 ├── patches/
-│   └── attention_patch.py           # Replaces SDPA with ONNX-safe MatMul+Softmax
+│   └── attention_patch.py           # Monkeypatches for SDPA, RMSNorm, and Oobleck padding
 ├── inference/
-│   └── ort_pipeline.py              # ONNX Runtime inference pipeline
+│   └── run_inference.py             # ONNX Runtime inference pipeline
 ├── quantization/
-│   └── quantize.py                  # INT8/INT4 post-export quantization
+│   ├── int8_quantize.py             # INT8 dynamic quantization script
+│   └── int4_quantize.py             # INT4 dynamic/weight-only quantization
 ├── device_selector.py               # Auto-detects best ORT execution provider
 └── StableAudio3_ONNX_Export.ipynb   # Google Colab notebook (GPU export)
 ```
