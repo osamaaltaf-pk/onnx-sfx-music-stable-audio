@@ -71,13 +71,38 @@ def _load_sessions(variant: str, precision: str) -> dict[str, object]:
     return sessions
 
 
-def _get_tokenizer():
+def _get_tokenizer(variant: str = "music"):
     """
     Load the T5 tokenizer for SA3's text encoder.
-    Respects SA3_TOKENIZER_ID env var for custom tokenizer overrides.
+    Attempts to locate the local cached tokenizer directory inside the HF Hub cache
+    first to allow offline execution. Falls back to loading via transformers Hub.
     """
     from transformers import AutoTokenizer
-    tokenizer_id = os.getenv("SA3_TOKENIZER_ID", "google/flan-t5-large")
+
+    # Check for custom override env var first
+    tokenizer_id = os.getenv("SA3_TOKENIZER_ID")
+    if tokenizer_id:
+        return AutoTokenizer.from_pretrained(tokenizer_id)
+
+    # Search for local t5gemma-b-b-ul2 folder inside HF cache directory
+    # Default cache path: hub/models--stabilityai--stable-audio-3-small-<variant>/snapshots
+    repo_name = f"models--stabilityai--stable-audio-3-small-{variant}"
+    hub_cache_root = os.getenv("HF_HUB_CACHE", str(Path.home() / ".cache" / "huggingface" / "hub"))
+    
+    # Try local cache relative path first (in the project workspace root)
+    local_hub = Path(__file__).resolve().parents[1] / "hub"
+    for cache_dir in [local_hub, Path(hub_cache_root)]:
+        repo_dir = cache_dir / repo_name / "snapshots"
+        if repo_dir.exists():
+            for snapshot_dir in repo_dir.iterdir():
+                tok_dir = snapshot_dir / "t5gemma-b-b-ul2"
+                if tok_dir.exists():
+                    print(f"[inference] Loading local tokenizer from: {tok_dir}")
+                    return AutoTokenizer.from_pretrained(str(tok_dir), local_files_only=True)
+
+    # Fallback to online loading
+    tokenizer_id = "google/flan-t5-large"
+    print(f"[inference] Local tokenizer not found in cache. Falling back to: {tokenizer_id}")
     return AutoTokenizer.from_pretrained(tokenizer_id)
 
 
@@ -123,7 +148,7 @@ def run_onnx_pipeline(
     # ------------------------------------------------------------------
     # Step 1: Tokenise prompt
     # ------------------------------------------------------------------
-    tokenizer = _get_tokenizer()
+    tokenizer = _get_tokenizer(variant)
     enc = tokenizer(
         prompt,
         return_tensors="np",
