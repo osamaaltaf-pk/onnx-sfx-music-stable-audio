@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# ONNX model outputs (large files — download from Drive instead)
+models/
+
+# OpenVINO cache
+.ov_cache/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# HuggingFace cache
+.cache/
+
+# Audio test outputs
+*.wav
+*.mp3
+
+# Logs
+*.log

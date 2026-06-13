@@ -1,0 +1,83 @@
+# ============================================================
+# Stable Audio 3 Small — ONNX Export Pipeline
+# Requirements
+# ============================================================
+# Install in this order to avoid dependency conflicts.
+# ============================================================
+
+# -----------------------------------------------------------------
+# PyTorch — CPU+CUDA build (CUDA 12.1)
+# For ROCm 6.0 systems, replace cu121 with rocm6.0
+# -----------------------------------------------------------------
+torch==2.2.2
+torchvision==0.17.2
+torchaudio==2.2.2
+--index-url https://download.pytorch.org/whl/cu121
+
+# -----------------------------------------------------------------
+# HuggingFace ecosystem
+# -----------------------------------------------------------------
+transformers==4.40.0
+diffusers==0.27.2
+accelerate==0.29.3
+huggingface-hub>=0.22.0
+
+# -----------------------------------------------------------------
+# Stability AI stable-audio-tools
+# (provides get_pretrained_model, DiffusionTransformer, Oobleck)
+# -----------------------------------------------------------------
+stable-audio-tools
+
+# -----------------------------------------------------------------
+# ONNX core
+# -----------------------------------------------------------------
+onnx==1.16.0
+
+# -----------------------------------------------------------------
+# ONNX Runtime
+# Install the correct variant for your hardware:
+#
+#   CPU only:
+#       pip install onnxruntime==1.18.0
+#
+#   NVIDIA CUDA:
+#       pip install onnxruntime-gpu==1.18.0
+#
+#   AMD ROCm:
+#       pip install onnxruntime-gpu==1.18.0  (ROCm build from AMD index)
+#
+#   Intel DirectML (Windows):
+#       pip install onnxruntime-directml==1.18.0
+#
+# Default below installs CPU. Override as needed.
+# -----------------------------------------------------------------
+onnxruntime==1.18.0
+
+# -----------------------------------------------------------------
+# Intel OpenVINO (Intel CPU + Intel Arc GPU)
+# Comment out if not using Intel hardware.
+# -----------------------------------------------------------------
+# openvino==2024.1.0
+# openvino-dev[onnx]==2024.1.0
+
+# -----------------------------------------------------------------
+# Quantization
+# -----------------------------------------------------------------
+# neural-compressor==2.5.0   # Intel INT4 (optional — Intel hardware only)
+
+# -----------------------------------------------------------------
+# FP16 ONNX conversion (needed for F4 failure recovery)
+# -----------------------------------------------------------------
+onnxconverter-common>=1.13.0
+
+# -----------------------------------------------------------------
+# Audio I/O and validation
+# -----------------------------------------------------------------
+numpy==1.26.4
+scipy>=1.12.0
+soundfile>=0.12.1
+
+# -----------------------------------------------------------------
+# Misc utilities
+# -----------------------------------------------------------------
+tqdm>=4.66.0
