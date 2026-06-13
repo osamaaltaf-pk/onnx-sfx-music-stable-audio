@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from config import OUTPUT_ROOT, DIFFUSION_STEPS, SAMPLE_RATE, MODEL_IDS
+from config import OUTPUT_ROOT, DIFFUSION_STEPS, SAMPLE_RATE, MODEL_IDS, LATENT_CHANNELS
 from device_selector import create_session, get_hardware_tier
 
 
@@ -189,7 +189,7 @@ def run_onnx_pipeline(
     # Latent time dim: sample_rate / downsampling_factor ≈ 44100 / 512 ≈ 86 frames/s
     DOWNSAMPLE = 512
     latent_t = max(1, int(duration_seconds * SAMPLE_RATE / DOWNSAMPLE))
-    latents  = np.random.randn(1, 64, latent_t).astype(np.float32)
+    latents  = np.random.randn(1, LATENT_CHANNELS, latent_t).astype(np.float32)
     mask     = np.ones((1, latent_t), dtype=np.bool_)
 
     print(f"[inference] latent shape: {latents.shape}")
@@ -284,6 +284,7 @@ def run_pytorch_pipeline(
             }],
             sample_size=sample_size,
             sampler_type="dpmpp-3m-sde",
+            seed=42,                # fix Windows numpy.random.randint int32 overflow
         )
 
     return output.squeeze().numpy().astype(np.float32)
