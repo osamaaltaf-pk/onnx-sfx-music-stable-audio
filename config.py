@@ -2,7 +2,7 @@
 import os
 
 MODEL_IDS = {
-    "music": "stabilityai/stable-audio-3-small",
+    "music": "stabilityai/stable-audio-3-small-music",
     "sfx":   "stabilityai/stable-audio-3-small-sfx",
 }
 
