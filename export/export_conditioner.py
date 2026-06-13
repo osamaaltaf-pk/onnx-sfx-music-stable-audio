@@ -47,13 +47,22 @@ def _load_model(variant: str):
         ) from hub_err
 
 
+class _SingleConditionerWrapper(torch.nn.Module):
+    """
+    Wraps a single timing conditioner (e.g. seconds_total) for ONNX export.
+    """
+    def __init__(self, cond):
+        super().__init__()
+        self.cond = cond
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.cond(x)
+
+
 class _DualConditionerWrapper(torch.nn.Module):
     """
     Wraps both seconds_start and seconds_total NumberConditioners into a
     single ONNX-exportable module that returns their concatenated output.
-
-    This lets us export a single conditioner.onnx that takes two float scalars
-    and returns the full global conditioning vector.
     """
 
     def __init__(self, cond_start, cond_total):
@@ -76,10 +85,10 @@ class _DualConditionerWrapper(torch.nn.Module):
 
 def export_conditioner(variant: str = "music") -> str | None:
     """
-    Export the timing conditioner for the given variant to ONNX.
+    Export the timing conditioner(s) for the given variant to ONNX.
 
-    Exports a dual-input wrapper (seconds_start, seconds_total) that returns
-    the concatenated conditioning vector used as global_cond in the DiT.
+    Dynamically handles models with both seconds_start/seconds_total,
+    only one of them, or neither.
 
     Args:
         variant: "music" or "sfx"
@@ -91,44 +100,73 @@ def export_conditioner(variant: str = "music") -> str | None:
     model, config = _load_model(variant)
     model.eval()
 
-    try:
-        cond_start = model.conditioner.conditioners["seconds_start"]
-        cond_total = model.conditioner.conditioners["seconds_total"]
-        print("[export_conditioner] Found seconds_start + seconds_total conditioners.")
-    except (AttributeError, KeyError) as e:
-        print(f"[export_conditioner] WARNING: Conditioners not found ({e}). "
-              "Skipping conditioner export.")
+    conds = model.conditioner.conditioners
+    has_start = "seconds_start" in conds
+    has_total = "seconds_total" in conds
+
+    if not has_start and not has_total:
+        print("[export_conditioner] WARNING: Neither seconds_start nor seconds_total conditioners found. Skipping.")
         return None
-
-    cond_start.eval()
-    cond_total.eval()
-
-    wrapper = _DualConditionerWrapper(cond_start, cond_total)
-    wrapper.eval()
-
-    # Dummy inputs: (batch, 1) float scalar values
-    dummy_start = torch.tensor([[0.0]],            dtype=torch.float32)  # seconds_start = 0
-    dummy_total = torch.tensor([[5.0]],            dtype=torch.float32)  # seconds_total = 5s
 
     out_dir  = Path(OUTPUT_ROOT) / variant / "fp16"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = str(out_dir / "conditioner.onnx")
 
+    if has_start and has_total:
+        print("[export_conditioner] Found seconds_start + seconds_total conditioners.")
+        cond_start = conds["seconds_start"]
+        cond_total = conds["seconds_total"]
+        cond_start.eval()
+        cond_total.eval()
+        wrapper = _DualConditionerWrapper(cond_start, cond_total)
+        
+        dummy_start = torch.tensor([[0.0]], dtype=torch.float32)
+        dummy_total = torch.tensor([[5.0]], dtype=torch.float32)
+        args = (dummy_start, dummy_total)
+        input_names = ["seconds_start", "seconds_total"]
+        dynamic_axes = {
+            "seconds_start": {0: "batch"},
+            "seconds_total": {0: "batch"},
+            "global_cond":   {0: "batch"},
+        }
+    elif has_start:
+        print("[export_conditioner] Found seconds_start conditioner only.")
+        cond = conds["seconds_start"]
+        cond.eval()
+        wrapper = _SingleConditionerWrapper(cond)
+        dummy_start = torch.tensor([[0.0]], dtype=torch.float32)
+        args = (dummy_start,)
+        input_names = ["seconds_start"]
+        dynamic_axes = {
+            "seconds_start": {0: "batch"},
+            "global_cond":   {0: "batch"},
+        }
+    else: # has_total
+        print("[export_conditioner] Found seconds_total conditioner only.")
+        cond = conds["seconds_total"]
+        cond.eval()
+        wrapper = _SingleConditionerWrapper(cond)
+        dummy_total = torch.tensor([[5.0]], dtype=torch.float32)
+        args = (dummy_total,)
+        input_names = ["seconds_total"]
+        dynamic_axes = {
+            "seconds_total": {0: "batch"},
+            "global_cond":   {0: "batch"},
+        }
+
+    wrapper.eval()
     print(f"[export_conditioner] Exporting to {out_path} ...")
     with torch.no_grad():
         torch.onnx.export(
             wrapper,
-            (dummy_start, dummy_total),
+            args,
             out_path,
+            dynamo=False,           # force TorchScript path
             opset_version=OPSET_VERSION,
             do_constant_folding=True,
-            input_names=["seconds_start", "seconds_total"],
+            input_names=input_names,
             output_names=["global_cond"],
-            dynamic_axes={
-                "seconds_start": {0: "batch"},
-                "seconds_total": {0: "batch"},
-                "global_cond":   {0: "batch"},
-            },
+            dynamic_axes=dynamic_axes,
         )
 
     print(f"[export_conditioner] ✓ saved → {out_path}")

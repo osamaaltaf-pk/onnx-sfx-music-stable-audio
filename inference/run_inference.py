@@ -177,10 +177,14 @@ def run_onnx_pipeline(
         seconds_start = np.array([[0.0]],                dtype=np.float32)
         seconds_total = np.array([[duration_seconds]],   dtype=np.float32)
 
-        global_cond = sessions["conditioner"].run(
-            None,
-            {"seconds_start": seconds_start, "seconds_total": seconds_total},
-        )[0]
+        cond_feeds = {
+            "seconds_start": seconds_start,
+            "seconds_total": seconds_total,
+        }
+        cond_inputs = {inp.name for inp in sessions["conditioner"].get_inputs()}
+        cond_feeds = {k: v for k, v in cond_feeds.items() if k in cond_inputs}
+
+        global_cond = sessions["conditioner"].run(None, cond_feeds)[0]
         print(f"[inference] global_cond shape: {global_cond.shape}")
 
     # ------------------------------------------------------------------
