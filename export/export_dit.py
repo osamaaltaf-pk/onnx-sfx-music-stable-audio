@@ -202,7 +202,7 @@ def export_dit(variant: str = "music") -> str:
             training=torch.onnx.TrainingMode.EVAL,
         )
 
-    print(f"[export_dit] ✓ saved → {out_path}")
+    print(f"[export_dit] [OK] saved -> {out_path}")
     return out_path
 
 

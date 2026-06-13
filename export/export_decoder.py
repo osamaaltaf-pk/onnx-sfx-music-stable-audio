@@ -149,7 +149,7 @@ def export_decoder(variant: str = "music") -> str:
             training=torch.onnx.TrainingMode.EVAL,
         )
 
-    print(f"[export_decoder] ✓ saved → {out_path}")
+    print(f"[export_decoder] [OK] saved -> {out_path}")
     return out_path
 
 

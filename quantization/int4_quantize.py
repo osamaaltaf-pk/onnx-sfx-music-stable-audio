@@ -82,7 +82,7 @@ def quantize_int4_matmulnbits(variant: str, name: str) -> str | None:
             str(int4_path),
             use_external_data_format=False,
         )
-        print(f"[int4/NBits] ✓ {name} → {int4_path}")
+        print(f"[int4/NBits] [OK] {name} -> {int4_path}")
         return str(int4_path)
 
     except Exception as e:
@@ -136,7 +136,7 @@ def quantize_int4_neural_compressor(variant: str, name: str) -> str | None:
         )
         q_model = quantization.fit(model=str(fp16_path), conf=config)
         q_model.save(str(int4_path))
-        print(f"[int4/INC] ✓ {name} → {int4_path}")
+        print(f"[int4/INC] [OK] {name} -> {int4_path}")
         return str(int4_path)
 
     except Exception as e:

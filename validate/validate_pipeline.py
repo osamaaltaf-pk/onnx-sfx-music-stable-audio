@@ -99,7 +99,7 @@ def validate_pipeline(variant: str = "sfx") -> float:
         print(f"[pipeline_validate] WARNING: PyTorch pipeline failed: {e}")
         print("[pipeline_validate] Skipping cross-comparison; running ONNX only.")
         run_onnx_pipeline(prompt, duration, variant)
-        print("[pipeline_validate] ONNX pipeline ran without error ✓")
+        print("[pipeline_validate] ONNX pipeline ran without error [OK]")
         return 1.0   # Can't compare; assume pass
 
     # -----------------------------------------------------------------
@@ -139,7 +139,7 @@ def validate_pipeline(variant: str = "sfx") -> float:
             "Check DiT dynamic axes and attention_patch application order."
         )
 
-    print(f"[pipeline_validate] ✓ Pipeline validated (sim={sim:.4f} ≥ {THRESHOLD})")
+    print(f"[pipeline_validate] [OK] Pipeline validated (sim={sim:.4f} >= {THRESHOLD})")
     return sim
 
 
@@ -161,8 +161,8 @@ def main():
 
     print("\n=== Validation Summary ===")
     for v, sim in results.items():
-        status = "✓" if sim >= 0.85 else "✗"
-        print(f"  {status}  {v:<6}  similarity={sim:.4f}")
+        status = "[OK]" if sim >= 0.85 else "[FAIL]"
+        print(f"  {status:<8} {v:<6}  similarity={sim:.4f}")
 
 
 if __name__ == "__main__":

@@ -101,7 +101,7 @@ def validate_module(
         has_inf = bool(np.isinf(out).any())
         max_mag = float(np.abs(out).max()) if out.size > 0 else 0.0
 
-        status_icon = "✓" if not has_nan and not has_inf else "✗"
+        status_icon = "OK" if not has_nan and not has_inf else "FAIL"
         print(
             f"  [{status_icon}] {out_name:<20} shape={list(out.shape)} "
             f"dtype={out.dtype}  max_magnitude={max_mag:.4f}"
@@ -120,5 +120,5 @@ def validate_module(
             "See agent.md §F4 for fix (FP32 export + onnxconverter_common)."
         )
 
-    print(f"[validate] {name} ({variant}) ✓  ONNX loads and runs cleanly.")
+    print(f"[validate] {name} ({variant}) [OK]  ONNX loads and runs cleanly.")
     return True

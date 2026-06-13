@@ -169,7 +169,7 @@ def export_conditioner(variant: str = "music") -> str | None:
             dynamic_axes=dynamic_axes,
         )
 
-    print(f"[export_conditioner] ✓ saved → {out_path}")
+    print(f"[export_conditioner] [OK] saved -> {out_path}")
     return out_path
 
 

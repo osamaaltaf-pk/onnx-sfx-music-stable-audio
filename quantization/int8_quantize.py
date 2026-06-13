@@ -72,7 +72,7 @@ def quantize_int8(variant: str = "music") -> dict[str, str]:
                 nodes_to_exclude=EXCLUDED_NODE_PATTERNS,
                 optimize_model=True,     # run ORT graph optimization before quant
             )
-            print(f"[int8] ✓ {name} → {int8_path}")
+            print(f"[int8] [OK] {name} -> {int8_path}")
             results[name] = str(int8_path)
 
         except Exception as e:

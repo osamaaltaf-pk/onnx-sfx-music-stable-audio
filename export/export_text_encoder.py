@@ -130,7 +130,7 @@ def export_text_encoder(variant: str = "music") -> str:
             },
         )
 
-    print(f"[export_text_encoder] ✓ saved → {out_path}")
+    print(f"[export_text_encoder] [OK] saved -> {out_path}")
     return out_path
 
 

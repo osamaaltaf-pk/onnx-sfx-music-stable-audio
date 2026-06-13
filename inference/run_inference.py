@@ -310,7 +310,7 @@ def save_wav(waveform: np.ndarray, path: str, sample_rate: int = SAMPLE_RATE) ->
     if peak > 0:
         waveform = waveform / peak * 0.95
     sf.write(path, waveform, sample_rate, subtype="PCM_16")
-    print(f"[inference] WAV saved → {path}")
+    print(f"[inference] WAV saved -> {path}")
 
 
 # ---------------------------------------------------------------------------

@@ -91,8 +91,8 @@ def run(variant: str) -> dict[str, str]:
     print(f" {variant.upper()} export summary")
     print(f"{'='*60}")
     for name, path in paths.items():
-        status = "✓" if name not in failed else "⚠"
-        print(f"  {status}  {name:<16} → {path}")
+        status = "[OK]" if name not in failed else "[WARN]"
+        print(f"  {status:<8} {name:<16} -> {path}")
     if failed:
         print(f"\n  Failed / warnings: {', '.join(failed)}")
     else:
