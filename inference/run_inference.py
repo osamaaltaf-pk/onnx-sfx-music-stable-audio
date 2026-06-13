@@ -210,11 +210,13 @@ def run_onnx_pipeline(
             "cross_attn_cond": text_hidden,
             "mask":            mask,
         }
-
-        # Include global_cond if the session expects it
-        dit_inputs = {inp.name for inp in sessions["dit"].get_inputs()}
-        if "global_cond" in dit_inputs:
+        if global_cond is not None:
             feeds["global_cond"] = global_cond
+
+        # Filter feeds to only include inputs expected by the DiT model
+        # (PyTorch JIT tracing may optimize out unused parameters like 'mask')
+        dit_inputs = {inp.name for inp in sessions["dit"].get_inputs()}
+        feeds = {k: v for k, v in feeds.items() if k in dit_inputs}
 
         velocity: np.ndarray = sessions["dit"].run(None, feeds)[0]
 
