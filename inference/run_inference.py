@@ -185,6 +185,8 @@ def run_onnx_pipeline(
         cond_feeds = {k: v for k, v in cond_feeds.items() if k in cond_inputs}
 
         global_cond = sessions["conditioner"].run(None, cond_feeds)[0]
+        if global_cond.ndim == 3 and global_cond.shape[1] == 1:
+            global_cond = global_cond.squeeze(1)
         print(f"[inference] global_cond shape: {global_cond.shape}")
 
     # ------------------------------------------------------------------
